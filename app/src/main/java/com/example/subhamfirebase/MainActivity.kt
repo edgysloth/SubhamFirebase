@@ -1,12 +1,19 @@
 package com.example.subhamfirebase
 
 import android.content.ContentValues.TAG
+import android.content.Context
+import android.net.Uri
 import android.nfc.Tag
 import android.os.Bundle
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -30,28 +38,32 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusModifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.rememberAsyncImagePainter
 import com.example.subhamfirebase.ui.theme.SubhamFirebaseTheme
 import com.google.firebase.Firebase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.firestore
 import com.google.firebase.firestore.toObject
+import com.google.firebase.storage.storage
+import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //enableEdgeToEdge()
         setContent {
-            val userList= remember {
+            /*val userList= remember {
                 mutableStateOf<List<User>>(emptyList())
             }
             LaunchedEffect(Unit) {
                 fetchStudents {users->
                     userList.value=users
                 }
-            }
+            }*/
             SubhamFirebaseTheme {
                 //addUserScreen()
                 /*LazyColumn (
@@ -63,7 +75,8 @@ class MainActivity : ComponentActivity() {
                         Text(text = "NAME:${user.name}, Age:${user.age}, SIC:${user.sic}")
                     }
                 }*/
-                deleteUserScreen()
+                //deleteUserScreen()
+                imageUploadScreen()
             }
         }
     }
@@ -110,6 +123,46 @@ class MainActivity : ComponentActivity() {
                     Log.w(TAG, "Error deleting 'sic' field", task.exception)
                 }
             }
+    }
+    val storage=Firebase.storage
+    val storageRef=storage.reference
+    fun uploadImage(uri: Uri,context: Context){
+        val fileName="images/${UUID.randomUUID()}.jpg"
+        val imageRef=storageRef.child(fileName)
+        imageRef.putFile(uri)
+            .addOnSuccessListener { taskSnapshot->
+                imageRef.downloadUrl.addOnSuccessListener { uri->
+                    Toast.makeText(context,"Image Uploaded successfully: $uri",Toast.LENGTH_LONG)
+                        .show()
+                }
+            }
+            .addOnFailureListener{e->
+                Toast.makeText(context,"Image failed: ${e.message}",Toast.LENGTH_SHORT).show()
+            }
+    }
+    @Composable
+    fun imageUploadScreen(){
+        val context= LocalContext.current
+        val imageUri=remember{
+            mutableStateOf<Uri?>(null)
+        }
+        val launcher= rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {uri->
+            imageUri.value=uri
+            uri?.let { uploadImage(uri,context) }
+        }
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ){
+            Button(onClick = { launcher.launch("image/*") }) {
+                Text(text = "Select Image")
+            }
+            Spacer(modifier=Modifier.height(20.dp))
+            imageUri.value?.let{uri->
+                Image(painter = rememberAsyncImagePainter(uri), contentDescription = null, modifier = Modifier.size(200.dp))
+            }
+        }
     }
     @Composable
     fun addUserScreen(){
